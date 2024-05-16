@@ -58,7 +58,6 @@ const Map = ({ geoports, geodata }) => {
 
     map.on("load", async () => {
       console.log("Preprocessing density...");
-      const startTime = Date.now();
 
       const geoportsResponse = await fetch("https://neuronserver.onrender.com//geoports");
       const geodataResponse = await fetch("https://neuronserver.onrender.com//geodata");
@@ -133,33 +132,65 @@ const Map = ({ geoports, geodata }) => {
         });
 
 
-        if (map) {
-          map.on("click", "geoports-markers", (e) => {
+        const popup = new mapboxgl.Popup({
+          closeButton: false,
+          closeOnClick: false
+        });
+
+        if(map) {
+          map.on("mouseenter", "geoports-markers", (e) => {
+            // Change the cursor style as a UI indicator.
+            map.getCanvas().style.cursor = 'pointer';
+
+            // Copy coordinates array.
             const coordinates = e.features[0].geometry.coordinates.slice();
-            const shipName = e.features[0].properties.name;
+            const portName = e.features[0].properties.name;
 
-            new mapboxgl.Popup()
-              .setLngLat(coordinates)
-              .setHTML(
-                `<b>${shipName}</b>`
-              )
-              .addTo(map);
-          });
+            // Ensure that if the map is zoomed out such that multiple
+            // copies of the feature are visible, the popup appears
+            // over the copy being pointed to.
+            while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+            }
 
-          // Change the cursor to a pointer when hovering over geoports-markers
-          map.on("mouseenter", "geoports-markers", () => {
-            map.getCanvas().style.cursor = "pointer";
-          });
+            // Populate the popup and set its coordinates
+            // based on the feature found.
+            popup.setLngLat(coordinates).setHTML(portName).addTo(map);
+        });
 
-          // Change it back to the default cursor when it leaves
-          map.on("mouseleave", "geoports-markers", () => {
-            map.getCanvas().style.cursor = "";
-          });
-        }
+        map.on('mouseleave', "geoports-markers", () => {
+            map.getCanvas().style.cursor = '';
+            popup.remove();
+        });
+      }
+      
+      if(map) {
+        map.on("mouseenter", "geodata-markers", (e) => {
+          // Change the cursor style as a UI indicator.
+          map.getCanvas().style.cursor = 'pointer';
 
+          // Copy coordinates array.
+          const coordinates = e.features[0].geometry.coordinates.slice();
+          const shipName = e.features[0].properties.name;
 
-        const endTime = Date.now();
-        console.log(`Processing Done in ${endTime - startTime}ms`);
+          // Ensure that if the map is zoomed out such that multiple
+          // copies of the feature are visible, the popup appears
+          // over the copy being pointed to.
+          while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+              coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+          }
+
+          // Populate the popup and set its coordinates
+          // based on the feature found.
+          popup.setLngLat(coordinates).setHTML(shipName).addTo(map);
+      });
+
+      map.on('mouseleave', "geodata-markers", () => {
+          map.getCanvas().style.cursor = '';
+          popup.remove();
+      });
+    } 
+
       } else {
         console.error("Failed to load GeoJSON data");
       }
@@ -179,7 +210,7 @@ const Map = ({ geoports, geodata }) => {
     <div className="container">
       <div ref={mapContainerRef} className="map-container" />
       <div className={`side-container ${showContainer ? "show" : ""}`}>
-        <h4>Visit of Ships in Past 2 Weeks</h4>
+        <h4>Visit of Ships in Past 7 days</h4>
         {shipsData.map((ship, index) => (
           <div className="data-div" key={index}>
             <h2 className="heading">
